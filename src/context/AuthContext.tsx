@@ -2,9 +2,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { User } from '@/types';
+import { User, Book, Match, mapSupabaseBook, SupabaseMatch } from '@/types';
 import { useNavigate } from 'react-router-dom';
-import { Book, Match } from '@/types';
 
 type AuthContextType = {
   user: User | null;
@@ -45,7 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (profileError) throw profileError;
           
           // Get user's books
-          const { data: ownedBooks, error: ownedBooksError } = await supabase
+          const { data: ownedBooksData, error: ownedBooksError } = await supabase
             .from('books')
             .select('*')
             .eq('owner_id', session.user.id)
@@ -53,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
           if (ownedBooksError) throw ownedBooksError;
           
-          const { data: wantedBooks, error: wantedBooksError } = await supabase
+          const { data: wantedBooksData, error: wantedBooksError } = await supabase
             .from('books')
             .select('*')
             .eq('owner_id', session.user.id)
@@ -62,12 +61,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (wantedBooksError) throw wantedBooksError;
           
           // Get user's matches
-          const { data: matches, error: matchesError } = await supabase
+          const { data: matchesData, error: matchesError } = await supabase
             .from('matches')
             .select('*')
             .or(`user_a_id.eq.${session.user.id},user_b_id.eq.${session.user.id}`);
             
           if (matchesError) throw matchesError;
+          
+          const ownedBooks = ownedBooksData ? ownedBooksData.map(mapSupabaseBook) : [];
+          const wantedBooks = wantedBooksData ? wantedBooksData.map(mapSupabaseBook) : [];
           
           setUser({
             id: session.user.id,
@@ -76,9 +78,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             userType: profileData?.user_type || 'individual',
             location: profileData?.location || null,
             createdAt: new Date(profileData?.created_at),
-            booksOwned: ownedBooks as Book[] || [],
-            booksWanted: wantedBooks as Book[] || [],
-            matches: matches as Match[] || [],
+            booksOwned: ownedBooks,
+            booksWanted: wantedBooks,
+            matches: matchesData as unknown as Match[] || [],
             completedSwaps: [],
           });
         }
@@ -124,7 +126,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (profileError) throw profileError;
       
       // Get user's books
-      const { data: ownedBooks, error: ownedBooksError } = await supabase
+      const { data: ownedBooksData, error: ownedBooksError } = await supabase
         .from('books')
         .select('*')
         .eq('owner_id', session.user.id)
@@ -132,7 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
       if (ownedBooksError) throw ownedBooksError;
       
-      const { data: wantedBooks, error: wantedBooksError } = await supabase
+      const { data: wantedBooksData, error: wantedBooksError } = await supabase
         .from('books')
         .select('*')
         .eq('owner_id', session.user.id)
@@ -141,12 +143,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (wantedBooksError) throw wantedBooksError;
       
       // Get user's matches
-      const { data: matches, error: matchesError } = await supabase
+      const { data: matchesData, error: matchesError } = await supabase
         .from('matches')
         .select('*')
         .or(`user_a_id.eq.${session.user.id},user_b_id.eq.${session.user.id}`);
         
       if (matchesError) throw matchesError;
+      
+      const ownedBooks = ownedBooksData ? ownedBooksData.map(mapSupabaseBook) : [];
+      const wantedBooks = wantedBooksData ? wantedBooksData.map(mapSupabaseBook) : [];
       
       setUser({
         id: session.user.id,
@@ -155,9 +160,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userType: profileData?.user_type || 'individual',
         location: profileData?.location || null,
         createdAt: new Date(profileData?.created_at),
-        booksOwned: ownedBooks as Book[] || [],
-        booksWanted: wantedBooks as Book[] || [],
-        matches: matches as Match[] || [],
+        booksOwned: ownedBooks,
+        booksWanted: wantedBooks,
+        matches: matchesData as unknown as Match[] || [],
         completedSwaps: [],
       });
     } catch (error) {

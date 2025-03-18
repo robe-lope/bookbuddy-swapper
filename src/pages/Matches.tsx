@@ -24,7 +24,7 @@ export default function Matches() {
   const [newMessage, setNewMessage] = useState('');
   
   // Mock data
-  const [matches, setMatches] = useState<Partial<Match>[]>([
+  const [matches, setMatches] = useState<Match[]>([
     {
       id: '1',
       status: 'pending',
@@ -32,6 +32,7 @@ export default function Matches() {
       messages: [
         {
           id: '1',
+          matchId: '1',
           senderId: '2',
           content: 'Hi there! I noticed we have a potential book swap. Are you interested?',
           createdAt: new Date(2023, 11, 1, 12, 30),
@@ -39,6 +40,7 @@ export default function Matches() {
         },
         {
           id: '2',
+          matchId: '1',
           senderId: '1',
           content: 'Yes, definitely! I\'ve been looking for your book for a while.',
           createdAt: new Date(2023, 11, 1, 12, 45),
@@ -46,6 +48,7 @@ export default function Matches() {
         },
         {
           id: '3',
+          matchId: '1',
           senderId: '2',
           content: 'Great! Would you prefer to meet up or mail the book?',
           createdAt: new Date(2023, 11, 1, 13, 0),
@@ -55,22 +58,44 @@ export default function Matches() {
       userA: {
         id: '1',
         username: 'BookLover',
+        email: 'booklover@example.com',
+        createdAt: new Date(),
+        booksOwned: [],
+        booksWanted: [],
+        matches: [],
+        completedSwaps: []
       },
       userB: {
         id: '2',
         username: 'PageTurner',
+        email: 'pageturner@example.com',
+        createdAt: new Date(),
+        booksOwned: [],
+        booksWanted: [],
+        matches: [],
+        completedSwaps: []
       },
       bookFromA: {
         id: '1',
         title: 'To Kill a Mockingbird',
         author: 'Harper Lee',
+        genre: 'Classic',
         condition: 'very-good',
+        ownerId: '1',
+        isAvailable: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
       bookFromB: {
         id: '7',
         title: 'The Catcher in the Rye',
         author: 'J.D. Salinger',
+        genre: 'Classic',
         condition: 'good',
+        ownerId: '2',
+        isAvailable: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
     },
     {
@@ -81,27 +106,58 @@ export default function Matches() {
       userA: {
         id: '1',
         username: 'BookLover',
+        email: 'booklover@example.com',
+        createdAt: new Date(),
+        booksOwned: [],
+        booksWanted: [],
+        matches: [],
+        completedSwaps: []
       },
       userB: {
         id: '3',
         username: 'Bibliophile',
+        email: 'bibliophile@example.com',
+        createdAt: new Date(),
+        booksOwned: [],
+        booksWanted: [],
+        matches: [],
+        completedSwaps: []
       },
       bookFromA: {
         id: '4',
         title: 'Pride and Prejudice',
         author: 'Jane Austen',
+        genre: 'Romance',
         condition: 'fair',
+        ownerId: '1',
+        isAvailable: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
       bookFromB: {
         id: '8',
         title: 'Lord of the Flies',
         author: 'William Golding',
+        genre: 'Classic',
         condition: 'like-new',
+        ownerId: '3',
+        isAvailable: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
     },
   ]);
   
-  const currentUser = { id: '1', username: 'BookLover' }; // Mock current user
+  const currentUser = { 
+    id: '1', 
+    username: 'BookLover',
+    email: 'booklover@example.com',
+    createdAt: new Date(),
+    booksOwned: [],
+    booksWanted: [],
+    matches: [],
+    completedSwaps: []
+  }; // Mock current user
   
   const handleSendMessage = () => {
     if (!activeMatchId || !newMessage.trim()) return;
@@ -111,8 +167,9 @@ export default function Matches() {
     if (matchIndex === -1) return;
     
     // Create a new message
-    const message: Partial<Message> = {
+    const message: Message = {
       id: Date.now().toString(),
+      matchId: activeMatchId,
       senderId: currentUser.id,
       content: newMessage.trim(),
       createdAt: new Date(),
@@ -133,7 +190,7 @@ export default function Matches() {
   const handleAcceptMatch = (matchId: string) => {
     // Update match status
     const updatedMatches = matches.map(match => 
-      match.id === matchId ? { ...match, status: 'accepted' } : match
+      match.id === matchId ? { ...match, status: 'accepted' as const } : match
     );
     
     setMatches(updatedMatches);
@@ -147,7 +204,7 @@ export default function Matches() {
   const handleDeclineMatch = (matchId: string) => {
     // Update match status
     const updatedMatches = matches.map(match => 
-      match.id === matchId ? { ...match, status: 'declined' } : match
+      match.id === matchId ? { ...match, status: 'declined' as const } : match
     );
     
     setMatches(updatedMatches);
@@ -161,7 +218,7 @@ export default function Matches() {
   const handleCompleteSwap = (matchId: string) => {
     // Update match status
     const updatedMatches = matches.map(match => 
-      match.id === matchId ? { ...match, status: 'completed' } : match
+      match.id === matchId ? { ...match, status: 'completed' as const } : match
     );
     
     setMatches(updatedMatches);

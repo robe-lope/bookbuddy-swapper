@@ -15,6 +15,7 @@ export type User = {
 export type BookCondition = 'like-new' | 'very-good' | 'good' | 'fair' | 'poor';
 export type EducationalLevel = 'primary' | 'secondary' | 'high-school' | 'university' | 'other';
 
+// Adjusted to match Supabase column names with camelCase for frontend usage
 export type Book = {
   id: string;
   title: string;
@@ -23,16 +24,17 @@ export type Book = {
   condition?: BookCondition;
   description?: string;
   imageUrl?: string;
-  ownerId: string;
-  isAvailable: boolean;
-  isWanted?: boolean;
-  isSchoolBook?: boolean;
+  ownerId: string; // Matches owner_id in Supabase
+  isAvailable: boolean; // Matches is_available in Supabase
+  isWanted?: boolean; // Matches is_wanted in Supabase
+  isSchoolBook?: boolean; // Matches is_school_book in Supabase
   educationalLevel?: EducationalLevel;
   subject?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date; // Matches created_at in Supabase
+  updatedAt: Date; // Matches updated_at in Supabase
 };
 
+// This is what we'll use internally in our app
 export type Match = {
   id: string;
   userA: User;
@@ -44,12 +46,24 @@ export type Match = {
   messages: Message[];
 };
 
+// This maps to what we get directly from Supabase
+export type SupabaseMatch = {
+  id: string;
+  user_a_id: string;
+  user_b_id: string;
+  book_from_a_id: string;
+  book_from_b_id: string;
+  status: 'pending' | 'accepted' | 'declined' | 'completed';
+  created_at: string;
+  updated_at: string;
+};
+
 export type Message = {
   id: string;
-  matchId: string;
-  senderId: string;
+  matchId: string; // Matches match_id in Supabase
+  senderId: string; // Matches sender_id in Supabase
   content: string;
-  createdAt: Date;
+  createdAt: Date; // Matches created_at in Supabase
   read: boolean;
 };
 
@@ -64,6 +78,25 @@ export type Swap = {
   rating?: number;
   review?: string;
 };
+
+// Convert Supabase response to frontend types
+export const mapSupabaseBook = (book: any): Book => ({
+  id: book.id,
+  title: book.title,
+  author: book.author,
+  genre: book.genre,
+  condition: book.condition as BookCondition,
+  description: book.description,
+  imageUrl: book.image_url,
+  ownerId: book.owner_id,
+  isAvailable: book.is_available,
+  isWanted: book.is_wanted,
+  isSchoolBook: book.is_school_book,
+  educationalLevel: book.educational_level as EducationalLevel,
+  subject: book.subject,
+  createdAt: new Date(book.created_at),
+  updatedAt: new Date(book.updated_at)
+});
 
 // For now, we'll use dummy data with these interfaces
 export const generateDummyData = () => {
