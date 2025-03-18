@@ -15,12 +15,14 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from '@/context/AuthContext';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function Register() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [userType, setUserType] = useState('individual');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [errors, setErrors] = useState<{
     username?: string;
@@ -78,8 +80,7 @@ export default function Register() {
     e.preventDefault();
     
     if (validateForm()) {
-      await register(email, username, password);
-      navigate('/profile');
+      await register(email, username, password, userType);
     }
   };
 
@@ -193,6 +194,34 @@ export default function Register() {
                 {errors.confirmPassword && (
                   <p className="text-red-500 text-sm">{errors.confirmPassword}</p>
                 )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-bookswap-darkbrown">
+                  Account Type
+                </Label>
+                <RadioGroup 
+                  value={userType} 
+                  onValueChange={setUserType} 
+                  className="flex gap-6 pt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem 
+                      value="individual" 
+                      id="individual"
+                      className="border-bookswap-beige text-bookswap-brown"
+                    />
+                    <Label htmlFor="individual" className="text-bookswap-brown">Individual</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem 
+                      value="business" 
+                      id="business"
+                      className="border-bookswap-beige text-bookswap-brown"
+                    />
+                    <Label htmlFor="business" className="text-bookswap-brown">Business/Bookstore</Label>
+                  </div>
+                </RadioGroup>
               </div>
               
               <div className="flex items-start space-x-2 pt-2">

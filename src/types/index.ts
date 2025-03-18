@@ -3,6 +3,8 @@ export type User = {
   id: string;
   email: string;
   username: string;
+  userType?: string;
+  location?: string | null;
   createdAt: Date;
   booksOwned: Book[];
   booksWanted: Book[];
@@ -11,6 +13,7 @@ export type User = {
 };
 
 export type BookCondition = 'like-new' | 'very-good' | 'good' | 'fair' | 'poor';
+export type EducationalLevel = 'primary' | 'secondary' | 'high-school' | 'university' | 'other';
 
 export type Book = {
   id: string;
@@ -22,6 +25,10 @@ export type Book = {
   imageUrl?: string;
   ownerId: string;
   isAvailable: boolean;
+  isWanted?: boolean;
+  isSchoolBook?: boolean;
+  educationalLevel?: EducationalLevel;
+  subject?: string;
   createdAt: Date;
   updatedAt: Date;
 };

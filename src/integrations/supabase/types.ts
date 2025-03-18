@@ -9,7 +9,176 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      books: {
+        Row: {
+          author: string
+          condition: string | null
+          created_at: string
+          description: string | null
+          educational_level: string | null
+          genre: string
+          id: string
+          image_url: string | null
+          is_available: boolean
+          is_school_book: boolean
+          is_wanted: boolean
+          owner_id: string
+          subject: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author: string
+          condition?: string | null
+          created_at?: string
+          description?: string | null
+          educational_level?: string | null
+          genre: string
+          id?: string
+          image_url?: string | null
+          is_available?: boolean
+          is_school_book?: boolean
+          is_wanted?: boolean
+          owner_id: string
+          subject?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author?: string
+          condition?: string | null
+          created_at?: string
+          description?: string | null
+          educational_level?: string | null
+          genre?: string
+          id?: string
+          image_url?: string | null
+          is_available?: boolean
+          is_school_book?: boolean
+          is_wanted?: boolean
+          owner_id?: string
+          subject?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      matches: {
+        Row: {
+          book_from_a_id: string
+          book_from_b_id: string
+          created_at: string
+          id: string
+          status: string
+          updated_at: string
+          user_a_id: string
+          user_b_id: string
+        }
+        Insert: {
+          book_from_a_id: string
+          book_from_b_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_a_id: string
+          user_b_id: string
+        }
+        Update: {
+          book_from_a_id?: string
+          book_from_b_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_a_id?: string
+          user_b_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matches_book_from_a_id_fkey"
+            columns: ["book_from_a_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_book_from_b_id_fkey"
+            columns: ["book_from_b_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          match_id: string
+          read: boolean
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          match_id: string
+          read?: boolean
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          match_id?: string
+          read?: boolean
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          latitude: number | null
+          location: string | null
+          longitude: number | null
+          updated_at: string
+          user_type: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          latitude?: number | null
+          location?: string | null
+          longitude?: number | null
+          updated_at?: string
+          user_type?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          location?: string | null
+          longitude?: number | null
+          updated_at?: string
+          user_type?: string
+          username?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
