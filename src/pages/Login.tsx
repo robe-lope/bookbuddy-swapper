@@ -14,6 +14,8 @@ export default function Login() {
   const [errors, setErrors] = useState<{email?: string; password?: string}>({});
   const { login, loading, error } = useAuth();
   const navigate = useNavigate();
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+
 
   const validateForm = () => {
     const newErrors: {email?: string; password?: string} = {};
@@ -34,10 +36,25 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (validateForm()) {
-      await login(email, password);
+    if (!validateForm()) return;
+
+    const controller = new AbortController();
+    setAbortController(controller);
+
+    try {
+      await login(email, password, controller.signal); // Pasamos el signal para cancelación
       navigate('/profile');
+    } catch (err) {
+        console.error('Login error:', err.message);
+    } finally {
+      setAbortController(null);
+    }
+  };
+
+  const handleCancel = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
     }
   };
 

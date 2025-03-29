@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import { BookPlus, Upload, BookMarked, Trash2 } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 import { Book, BookCondition } from '@/types';
 import Navbar from '@/components/Navbar';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function PostBook() {
   const { toast } = useToast();
@@ -24,6 +25,7 @@ export default function PostBook() {
   
   // Form state for books to offer
   const [offerBook, setOfferBook] = useState<Partial<Book>>({
+    isbn: '',
     title: '',
     author: '',
     genre: '',
@@ -33,6 +35,7 @@ export default function PostBook() {
   
   // Form state for books wanted
   const [wantedBook, setWantedBook] = useState<Partial<Book>>({
+    isbn: '',
     title: '',
     author: '',
     genre: '',
@@ -52,14 +55,61 @@ export default function PostBook() {
     { value: 'poor', label: 'Poor' },
   ];
   
+  const fetchBookByIsbn = useCallback(async (isbn: string, isOffer: boolean) => {
+    try {
+      const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+      const data = await response.json();
+      
+      if (data.totalItems === 0) {
+        toast({
+          title: "No book found",
+          description: "No book matches that ISBN",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const book = data.items[0].volumeInfo;
+      const bookData = {
+        isbn,
+        title: book.title || '',
+        author: book.authors?.[0] || '',
+        genre: book.categories?.[0] || '',
+      };
+
+      if (isOffer) {
+        setOfferBook(prev => ({ ...prev, ...bookData }));
+      } else {
+        setWantedBook(prev => ({ ...prev, ...bookData }));
+      }
+
+      toast({
+        title: "Book found",
+        description: `Autofilled: ${book.title}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch book data",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
   const handleOfferInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setOfferBook(prev => ({ ...prev, [name]: value }));
+    if (name === 'isbn' && value.length >= 10) {
+      fetchBookByIsbn(value, true);
+    }
   };
   
   const handleWantedInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setWantedBook(prev => ({ ...prev, [name]: value }));
+    if (name === 'isbn' && value.length >= 10) {
+      fetchBookByIsbn(value, false);
+    }
   };
   
   const handleOfferSelectChange = (name: string, value: string) => {
@@ -106,6 +156,15 @@ export default function PostBook() {
   };
   
   const validateOfferForm = () => {
+    if (!offerBook.isbn?.trim()) {
+      toast({
+        title: "Missing ISBN",
+        description: "Please enter the book's ISBN",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     if (!offerBook.title?.trim()) {
       toast({
         title: "Missing title",
@@ -176,49 +235,80 @@ export default function PostBook() {
     return true;
   };
   
-  const handleOfferSubmit = (e: React.FormEvent) => {
+  const uploadImage = async (file: File) => {
+    const fileName = `${Date.now()}-${file.name}`;
+    const { data, error } = await supabase.storage
+      .from('book-images')
+      .upload(fileName, file);
+    if (error) throw error;
+    const { publicUrl } = supabase.storage.from('book-images').getPublicUrl(fileName).data;
+    return publicUrl;
+  };
+
+  const handleOfferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (validateOfferForm()) {
-      // In a real app, this would create a new book
-      console.log('Submitting offer book:', offerBook, imageFile);
-      
-      toast({
-        title: "Book added successfully",
-        description: "Your book has been added to your offers",
+    if (!validateOfferForm()) return;
+
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        toast({ title: "Authentication required", description: "Please log in to add a book", variant: "destructive" });
+        return;
+      }
+
+      const imageUrl = imageFile ? await uploadImage(imageFile) : null;
+      const { error } = await supabase.from('books').insert({
+        isbn: offerBook.isbn,
+        title: offerBook.title,
+        author: offerBook.author,
+        genre: offerBook.genre,
+        condition: offerBook.condition,
+        description: offerBook.description,
+        image_url: imageUrl,
+        owner_id: user.id,
+        is_available: true,
       });
-      
-      // Reset form
-      setOfferBook({
-        title: '',
-        author: '',
-        genre: '',
-        condition: 'good',
-        description: '',
-      });
+
+      if (error) throw error;
+
+      toast({ title: "Book added successfully", description: "Your book has been added to your offers" });
+      setOfferBook({ isbn: '', title: '', author: '', genre: '', condition: 'good', description: '' });
       setImagePreview(null);
       setImageFile(null);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add book", variant: "destructive" });
     }
   };
   
-  const handleWantedSubmit = (e: React.FormEvent) => {
+  const handleWantedSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (validateWantedForm()) {
-      // In a real app, this would create a new wanted book
-      console.log('Submitting wanted book:', wantedBook);
-      
-      toast({
-        title: "Book added successfully",
-        description: "Your book has been added to your wishlist",
+    if (!validateWantedForm()) return;
+
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        toast({ title: "Authentication required", description: "Please log in to add a book", variant: "destructive" });
+        return;
+      }
+      const { error } = await supabase.from('books').insert({
+        isbn: wantedBook.isbn || null,
+        title: wantedBook.title,
+        author: wantedBook.author,
+        genre: wantedBook.genre,
+        description: wantedBook.description,
+        owner_id: user.id,
+        is_available: false,
+        is_wanted: true,
       });
-      
-      // Reset form
-      setWantedBook({
-        title: '',
-        author: '',
-        genre: '',
-      });
+
+      if (error) throw error;
+
+      toast({ title: "Book added successfully", description: "Your book has been added to your wishlist" });
+      setWantedBook({ isbn: '', title: '', author: '', genre: '', description: '' });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add book", variant: "destructive" });
     }
   };
 
@@ -264,6 +354,21 @@ export default function PostBook() {
               <form onSubmit={handleOfferSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-6">
+                  <div className="space-y-2">
+                      <Label htmlFor="isbn" className="text-bookswap-darkbrown">
+                        ISBN <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="isbn"
+                        name="isbn"
+                        value={offerBook.isbn}
+                        onChange={handleOfferInputChange}
+                        placeholder="Enter the book's ISBN (10 or 13 digits)"
+                        className="border-bookswap-beige focus-visible:ring-bookswap-brown/20"
+                        required
+                      />
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="title" className="text-bookswap-darkbrown">
                         Book Title <span className="text-red-500">*</span>

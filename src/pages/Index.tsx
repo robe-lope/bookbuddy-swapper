@@ -263,7 +263,7 @@ export default function Index() {
                 <Link to="/browse">
                   <Button 
                     variant="outline" 
-                    className="text-white border-white hover:bg-white/10"
+                    className="text-bookswap-brown border-white hover:text-bookswap-brown/10"
                   >
                     {t('exploreBooks')}
                   </Button>

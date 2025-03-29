@@ -18,6 +18,7 @@ export type EducationalLevel = 'primary' | 'secondary' | 'high-school' | 'univer
 // Adjusted to match Supabase column names with camelCase for frontend usage
 export type Book = {
   id: string;
+  isbn?: string;
   title: string;
   author: string;
   genre: string;
@@ -82,6 +83,7 @@ export type Swap = {
 // Convert Supabase response to frontend types
 export const mapSupabaseBook = (book: any): Book => ({
   id: book.id,
+  isbn: book.isbn,
   title: book.title,
   author: book.author,
   genre: book.genre,
@@ -109,6 +111,7 @@ export const generateDummyData = () => {
   const books: Partial<Book>[] = [
     {
       id: '1',
+      isbn: '9780061120084',
       title: 'To Kill a Mockingbird',
       author: 'Harper Lee',
       genre: 'Classic',
@@ -123,6 +126,7 @@ export const generateDummyData = () => {
     {
       id: '2',
       title: 'The Great Gatsby',
+      isbn: '9780743273565',
       author: 'F. Scott Fitzgerald',
       genre: 'Classic',
       condition: 'good',
@@ -190,6 +194,7 @@ export const generateDummyData = () => {
   const wantedBooks: Partial<Book>[] = [
     {
       id: '7',
+      isbn: '9780316769488',
       title: 'The Catcher in the Rye',
       author: 'J.D. Salinger',
       genre: 'Classic',

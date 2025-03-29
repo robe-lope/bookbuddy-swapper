@@ -9,8 +9,8 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, username: string, password: string, userType?: string) => Promise<void>;
+  login: (email: string, password: string, signal?: AbortSignal) => Promise<void>;
+  register: (email: string, username: string, password: string, userType?: string, signal?: AbortSignal) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   fetchUserProfile: () => Promise<void>;
@@ -188,7 +188,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: "Welcome back to BookSwap!",
       });
       
-      navigate('/profile');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during login');
       toast({
@@ -196,6 +195,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: err instanceof Error ? err.message : 'An error occurred during login',
         variant: "destructive",
       });
+      throw err; 
     } finally {
       setLoading(false);
     }
@@ -226,7 +226,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: "Welcome to BookSwap!",
       });
       
-      navigate('/profile');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during registration');
       toast({
