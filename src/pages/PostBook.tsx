@@ -59,7 +59,16 @@ export default function PostBook() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   
-  const genres = ['Classic', 'Science Fiction', 'Fantasy', 'Romance', 'Mystery', 'Thriller', 'Biography', 'History', 'Philosophy', 'Poetry'];
+  const genres = [
+    'Ficción', 'No ficción', 'Clásicos', 'Ciencia ficción', 'Fantasía', 'Romance',
+    'Misterio', 'Thriller', 'Terror', 'Aventura', 'Histórico', 'Poesía',
+    'Ensayo', 'Biografía', 'Autobiografía', 'Filosofía', 'Psicología',
+    'Crecimiento personal', 'Educación', 'Infantil', 'Juvenil', 'Arte',
+    'Fotografía', 'Cómics', 'Manga', 'Gastronomía', 'Cocina', 'Autoayuda',
+    'Negocios', 'Economía', 'Finanzas', 'Espiritualidad', 'Religión', 'Ciencias',
+    'Matemáticas', 'Medicina', 'Salud', 'Deportes', 'Viajes', 'Política',
+    'Sociología', 'Tecnología', 'Informática', 'Derecho'
+  ];
   
   const conditionOptions: { value: BookCondition; label: string }[] = [
     { value: 'like-new', label: 'Like New' },

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,67 +16,22 @@ import {
   Trash2 
 } from 'lucide-react';
 import BookCard from '@/components/BookCard';
-import { Book, Match } from '@/types';
+import { Book, Match, mapSupabaseBook } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  // Mock data
-  const [ownedBooks, setOwnedBooks] = useState<Partial<Book>[]>([
-    {
-      id: '1',
-      title: 'To Kill a Mockingbird',
-      author: 'Harper Lee',
-      genre: 'Classic',
-      condition: 'very-good',
-      description: 'A classic novel about racial inequality in the American South.',
-      imageUrl: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=800',
-      isAvailable: true,
-      createdAt: new Date(2023, 5, 15),
-      updatedAt: new Date(2023, 5, 15),
-    },
-    {
-      id: '4',
-      title: 'Pride and Prejudice',
-      author: 'Jane Austen',
-      genre: 'Romance',
-      condition: 'fair',
-      description: 'A romantic novel about Elizabeth Bennet and Mr. Darcy.',
-      imageUrl: 'https://images.unsplash.com/photo-1614955223913-1b231ffc7c5a?q=80&w=800',
-      isAvailable: true,
-      createdAt: new Date(2023, 8, 20),
-      updatedAt: new Date(2023, 8, 20),
-    },
-  ]);
-  
-  const [wantedBooks, setWantedBooks] = useState<Partial<Book>[]>([
-    {
-      id: '7',
-      title: 'The Catcher in the Rye',
-      author: 'J.D. Salinger',
-      genre: 'Classic',
-      isAvailable: false,
-      createdAt: new Date(2023, 5, 20),
-      updatedAt: new Date(2023, 5, 20),
-    },
-    {
-      id: '8',
-      title: 'Lord of the Flies',
-      author: 'William Golding',
-      genre: 'Classic',
-      isAvailable: false,
-      createdAt: new Date(2023, 6, 15),
-      updatedAt: new Date(2023, 6, 15),
-    },
-  ]);
-  
+  const [ownedBooks, setOwnedBooks] = useState<Book[]>([]);
+  const [wantedBooks, setWantedBooks] = useState<Book[]>([]);
   const [matches, setMatches] = useState<Partial<Match>[]>([
+    // Dejamos matches mockeado por ahora
     {
       id: '1',
       status: 'pending',
@@ -85,7 +40,54 @@ export default function Profile() {
   ]);
   
   const [completedSwaps, setCompletedSwaps] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchUserBooks = async (userId: string) => {
+    try {
+      // Libros ofrecidos
+      const { data: ownedData, error: ownedError } = await supabase
+        .from('books')
+        .select('*')
+        .eq('owner_id', userId)
+        .eq('is_available', true);
+
+      if (ownedError) throw ownedError;
+
+      // Libros deseados
+      const { data: wantedData, error: wantedError } = await supabase
+        .from('books')
+        .select('*')
+        .eq('owner_id', userId)
+        .eq('is_wanted', true);
+
+      if (wantedError) throw wantedError;
+
+      const ownedBooksData = ownedData.map(mapSupabaseBook);
+      const wantedBooksData = wantedData.map(mapSupabaseBook);
+
+      setOwnedBooks(ownedBooksData);
+      setWantedBooks(wantedBooksData);
+    } catch (error: any) { // Usamos Error como tipo, como resolvimos antes
+      console.error('Error fetching user books:', error.message);
+      toast({
+        title: "Error",
+        description: "Failed to load your books",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchUserBooks(user.id);
+    } else {
+      setIsLoading(false); // Si no hay usuario, no intentamos cargar
+    }
+  }, [user]);
   
+
   const handleLogout = () => {
     logout();
     toast({
@@ -95,17 +97,36 @@ export default function Profile() {
     navigate('/');
   };
   
-  const handleRemoveBook = (id: string, isWanted: boolean) => {
-    if (isWanted) {
-      setWantedBooks(current => current.filter(book => book.id !== id));
-    } else {
-      setOwnedBooks(current => current.filter(book => book.id !== id));
+  const handleRemoveBook = async (id: string, isWanted: boolean) => {
+    try {
+      // Eliminamos el libro de Supabase
+      const { error } = await supabase
+        .from('books')
+        .delete()
+        .eq('id', id)
+        .eq('owner_id', user.id);
+
+      if (error) throw error;
+
+      // Actualizamos el estado local
+      if (isWanted) {
+        setWantedBooks(current => current.filter(book => book.id !== id));
+      } else {
+        setOwnedBooks(current => current.filter(book => book.id !== id));
+      }
+      
+      toast({
+        title: "Book removed",
+        description: `The book has been removed from your ${isWanted ? 'wishlist' : 'offers'}`,
+      });
+    } catch (error: any) {
+      console.error('Error removing book:', error.message);
+      toast({
+        title: "Error",
+        description: "Failed to remove the book",
+        variant: "destructive",
+      });
     }
-    
-    toast({
-      title: "Book removed",
-      description: `The book has been removed from your ${isWanted ? 'wishlist' : 'offers'}`,
-    });
   };
 
   // If the user is not authenticated, redirect to login

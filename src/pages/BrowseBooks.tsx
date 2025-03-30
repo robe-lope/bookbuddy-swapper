@@ -25,32 +25,74 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Search, Filter, CheckCircle, SlidersHorizontal } from 'lucide-react';
 import BookCard from '@/components/BookCard';
-import { Book, generateDummyData } from '@/types';
+import { Book, mapSupabaseBook } from '@/types';
 import Navbar from '@/components/Navbar';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 
 export default function BrowseBooks() {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [selectedCondition, setSelectedCondition] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
-  const [booksData, setBooksData] = useState<Partial<Book>[]>([]);
-  const [wantedBooksData, setWantedBooksData] = useState<Partial<Book>[]>([]);
+  const [booksData, setBooksData] = useState<Book[]>([]);
+  const [wantedBooksData, setWantedBooksData] = useState<Book[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   
-  useEffect(() => {
-    // Simulate fetching data
-    const timer = setTimeout(() => {
-      const data = generateDummyData();
-      setBooksData(data.books);
-      setWantedBooksData(data.wantedBooks);
+  const fetchUserBooks = async (userId: string) => {
+    try {
+      // Libros ofrecidos
+      const { data: ownedData, error: ownedError } = await supabase
+        .from('books')
+        .select('*')
+        .eq('owner_id', userId)
+        .eq('is_available', true);
+
+      if (ownedError) throw ownedError;
+
+      // Libros deseados
+      const { data: wantedData, error: wantedError } = await supabase
+        .from('books')
+        .select('*')
+        .eq('owner_id', userId)
+        .eq('is_wanted', true);
+
+      if (wantedError) throw wantedError;
+
+      // Mapeamos los datos al tipo Book
+      const ownedBooks = ownedData.map(mapSupabaseBook);
+      const wantedBooks = wantedData.map(mapSupabaseBook);
+
+      setBooksData(ownedBooks);
+      setWantedBooksData(wantedBooks);
+    } catch (error) {
+      console.error('Error fetching user books:', error.message);
+    } finally {
       setIsLoading(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id) {
+      setIsLoading(false); // Si no hay usuario, no cargamos nada
+      return;
+    }
+
+    fetchUserBooks(user.id);
+  }, [user]);
   
-  const genres = ['Classic', 'Science Fiction', 'Fantasy', 'Romance', 'Mystery', 'Thriller', 'Biography', 'History', 'Philosophy', 'Poetry'];
+  const genres = [
+    'Ficción', 'No ficción', 'Clásicos', 'Ciencia ficción', 'Fantasía', 'Romance',
+    'Misterio', 'Thriller', 'Terror', 'Aventura', 'Histórico', 'Poesía',
+    'Ensayo', 'Biografía', 'Autobiografía', 'Filosofía', 'Psicología',
+    'Crecimiento personal', 'Educación', 'Infantil', 'Juvenil', 'Arte',
+    'Fotografía', 'Cómics', 'Manga', 'Gastronomía', 'Cocina', 'Autoayuda',
+    'Negocios', 'Economía', 'Finanzas', 'Espiritualidad', 'Religión', 'Ciencias',
+    'Matemáticas', 'Medicina', 'Salud', 'Deportes', 'Viajes', 'Política',
+    'Sociología', 'Tecnología', 'Informática', 'Derecho'
+  ];
   const conditions = ['like-new', 'very-good', 'good', 'fair', 'poor'];
   
   const sortOptions = [
@@ -60,7 +102,7 @@ export default function BrowseBooks() {
     { value: 'title-desc', label: 'Title (Z-A)' },
   ];
   
-  const filterBooks = (books: Partial<Book>[]) => {
+  const filterBooks = (books: Book[]) => {
     return books.filter(book => {
       const matchesSearch = 
         searchTerm === '' || 
@@ -79,13 +121,13 @@ export default function BrowseBooks() {
     }).sort((a, b) => {
       switch (sortBy) {
         case 'newest':
-          return (new Date(b.createdAt!).getTime()) - (new Date(a.createdAt!).getTime());
+          return b.createdAt.getTime() - a.createdAt.getTime();
         case 'oldest':
-          return (new Date(a.createdAt!).getTime()) - (new Date(b.createdAt!).getTime());
+          return a.createdAt.getTime() - b.createdAt.getTime();
         case 'title-asc':
-          return a.title!.localeCompare(b.title!);
+          return a.title.localeCompare(b.title);
         case 'title-desc':
-          return b.title!.localeCompare(a.title!);
+          return b.title.localeCompare(a.title);
         default:
           return 0;
       }
