@@ -5,6 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -18,6 +24,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Book, BookCondition } from '@/types';
 import Navbar from '@/components/Navbar';
 import { supabase } from '@/integrations/supabase/client';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function PostBook() {
   const { toast } = useToast();
@@ -31,6 +38,8 @@ export default function PostBook() {
     genre: '',
     condition: 'good',
     description: '',
+    price: null,
+    acceptsSwap: false,
   });
   
   // Form state for books wanted
@@ -87,6 +96,7 @@ export default function PostBook() {
         title: "Book found",
         description: `Autofilled: ${book.title}`,
       });
+      console.log(book);
     } catch (error) {
       toast({
         title: "Error",
@@ -247,17 +257,31 @@ export default function PostBook() {
 
   const handleOfferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted, offerBook:', offerBook);
     
-    if (!validateOfferForm()) return;
+    if (!validateOfferForm()){
+      console.log('Validation failed');
+      return;
+    } 
 
     try {
+    console.log('Checking current session...');
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    console.log('Session:', sessionData, 'Session Error:', sessionError);
+    if (!sessionData?.session) {
+      throw new Error('No active session found. Please log in.');
+    }
+      console.log('Fetching user...');
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
+        console.log('Auth error:', authError?.message);
         toast({ title: "Authentication required", description: "Please log in to add a book", variant: "destructive" });
         return;
       }
+      console.log('User fetched:', user.id);
 
       const imageUrl = imageFile ? await uploadImage(imageFile) : null;
+      console.log('Inserting book into Supabase...');
       const { error } = await supabase.from('books').insert({
         isbn: offerBook.isbn,
         title: offerBook.title,
@@ -268,9 +292,15 @@ export default function PostBook() {
         image_url: imageUrl,
         owner_id: user.id,
         is_available: true,
+        price: offerBook.price,
+        accepts_swap: offerBook.acceptsSwap,
       });
 
-      if (error) throw error;
+      if (error){ 
+        console.error('Supabase error:', error.message);
+        throw new Error(`Supabase error: ${error.message}`);
+      }
+      console.log('Book inserted successfully');
 
       toast({ title: "Book added successfully", description: "Your book has been added to your offers" });
       setOfferBook({ isbn: '', title: '', author: '', genre: '', condition: 'good', description: '' });
@@ -293,7 +323,7 @@ export default function PostBook() {
         return;
       }
       const { error } = await supabase.from('books').insert({
-        isbn: wantedBook.isbn || null,
+        isbn: wantedBook.isbn,
         title: wantedBook.title,
         author: wantedBook.author,
         genre: wantedBook.genre,
@@ -355,9 +385,18 @@ export default function PostBook() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-6">
                   <div className="space-y-2">
+                  <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
                       <Label htmlFor="isbn" className="text-bookswap-darkbrown">
                         ISBN <span className="text-red-500">*</span>
                       </Label>
+                      </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Enter a 10 or 13-digit ISBN to autofill book details</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <Input
                         id="isbn"
                         name="isbn"
@@ -524,6 +563,35 @@ export default function PostBook() {
                         className="border-bookswap-beige focus-visible:ring-bookswap-brown/20 min-h-[120px]"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="price" className="text-bookswap-darkbrown">
+                        Price (optional)
+                      </Label>
+                      <Input
+                        id="price"
+                        name="price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={offerBook.price ?? ''}
+                        onChange={handleOfferInputChange}
+                        placeholder="Enter price in your currency (e.g., 500)"
+                        className="border-bookswap-beige focus-visible:ring-bookswap-brown/20"
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="acceptsSwap"
+                        checked={offerBook.acceptsSwap}
+                        onCheckedChange={(checked) => setOfferBook(prev => ({ ...prev, acceptsSwap: !!checked }))}
+                      />
+                      <Label htmlFor="acceptsSwap" className="text-bookswap-darkbrown">
+                        Accept swap for this book
+                      </Label>
+                    </div>
+
+
                   </div>
                 </div>
                 

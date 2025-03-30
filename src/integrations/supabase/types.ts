@@ -13,11 +13,12 @@ export type Database = {
         Row: {
           author: string
           condition: string | null
-          created_at: string
+          created_at: string | null
           description: string | null
           educational_level: string | null
           genre: string
           id: string
+          isbn: string | null
           image_url: string | null
           is_available: boolean
           is_school_book: boolean
@@ -26,15 +27,18 @@ export type Database = {
           subject: string | null
           title: string
           updated_at: string
+          price: number | null
+          accepts_swap: boolean
         }
         Insert: {
           author: string
           condition?: string | null
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           educational_level?: string | null
           genre: string
           id?: string
+          isbn?: string | null
           image_url?: string | null
           is_available?: boolean
           is_school_book?: boolean
@@ -43,15 +47,18 @@ export type Database = {
           subject?: string | null
           title: string
           updated_at?: string
+          price: number | null
+          accepts_swap: boolean
         }
         Update: {
           author?: string
           condition?: string | null
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           educational_level?: string | null
           genre?: string
           id?: string
+          isbn?: string | null
           image_url?: string | null
           is_available?: boolean
           is_school_book?: boolean
@@ -59,7 +66,9 @@ export type Database = {
           owner_id?: string
           subject?: string | null
           title?: string
-          updated_at?: string
+          updated_at?: string | null
+          price: number | null
+          accepts_swap: boolean
         }
         Relationships: []
       }
