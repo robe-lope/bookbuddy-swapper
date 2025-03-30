@@ -1,4 +1,3 @@
-
 export type User = {
   id: string;
   email: string;
@@ -102,7 +101,6 @@ export const mapSupabaseBook = (book: any): Book => ({
   updatedAt: new Date(book.updated_at),
   price: book.price,
   acceptsSwap: book.accepts_swap,
-  
 });
 
 // For now, we'll use dummy data with these interfaces

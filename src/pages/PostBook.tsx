@@ -25,10 +25,15 @@ import { Book, BookCondition } from '@/types';
 import Navbar from '@/components/Navbar';
 import { supabase } from '@/integrations/supabase/client';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 
 export default function PostBook() {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('offer');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form state for books to offer
   const [offerBook, setOfferBook] = useState<Partial<Book>>({
@@ -39,7 +44,7 @@ export default function PostBook() {
     condition: 'good',
     description: '',
     price: null,
-    acceptsSwap: false,
+    acceptsSwap: true,
   });
   
   // Form state for books wanted
@@ -96,8 +101,9 @@ export default function PostBook() {
         title: "Book found",
         description: `Autofilled: ${book.title}`,
       });
-      console.log(book);
+      console.log('Book data:', book);
     } catch (error) {
+      console.error('Error fetching book data:', error);
       toast({
         title: "Error",
         description: "Failed to fetch book data",
@@ -166,15 +172,6 @@ export default function PostBook() {
   };
   
   const validateOfferForm = () => {
-    if (!offerBook.isbn?.trim()) {
-      toast({
-        title: "Missing ISBN",
-        description: "Please enter the book's ISBN",
-        variant: "destructive",
-      });
-      return false;
-    }
-
     if (!offerBook.title?.trim()) {
       toast({
         title: "Missing title",
@@ -246,101 +243,195 @@ export default function PostBook() {
   };
   
   const uploadImage = async (file: File) => {
-    const fileName = `${Date.now()}-${file.name}`;
-    const { data, error } = await supabase.storage
-      .from('book-images')
-      .upload(fileName, file);
-    if (error) throw error;
-    const { publicUrl } = supabase.storage.from('book-images').getPublicUrl(fileName).data;
-    return publicUrl;
+    try {
+      const fileName = `${Date.now()}-${file.name}`;
+      const { data, error } = await supabase.storage
+        .from('book-images')
+        .upload(fileName, file);
+        
+      if (error) {
+        console.error('Storage error:', error);
+        throw error;
+      }
+      
+      const { data: urlData } = supabase.storage.from('book-images').getPublicUrl(fileName);
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Image upload error:', error);
+      throw error;
+    }
   };
 
   const handleOfferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted, offerBook:', offerBook);
     
-    if (!validateOfferForm()){
-      console.log('Validation failed');
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to add a book",
+        variant: "destructive"
+      });
+      navigate('/login');
       return;
-    } 
-
-    try {
-    console.log('Checking current session...');
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    console.log('Session:', sessionData, 'Session Error:', sessionError);
-    if (!sessionData?.session) {
-      throw new Error('No active session found. Please log in.');
     }
-      console.log('Fetching user...');
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.log('Auth error:', authError?.message);
-        toast({ title: "Authentication required", description: "Please log in to add a book", variant: "destructive" });
-        return;
+    
+    if (!validateOfferForm()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      console.log('Starting book offer submission process');
+      console.log('Current user:', user);
+      
+      let imageUrl = null;
+      if (imageFile) {
+        console.log('Uploading image...');
+        imageUrl = await uploadImage(imageFile);
+        console.log('Image uploaded successfully:', imageUrl);
       }
-      console.log('User fetched:', user.id);
-
-      const imageUrl = imageFile ? await uploadImage(imageFile) : null;
-      console.log('Inserting book into Supabase...');
-      const { error } = await supabase.from('books').insert({
-        isbn: offerBook.isbn,
+      
+      const bookData = {
+        isbn: offerBook.isbn || null,
         title: offerBook.title,
         author: offerBook.author,
         genre: offerBook.genre,
         condition: offerBook.condition,
-        description: offerBook.description,
+        description: offerBook.description || null,
         image_url: imageUrl,
         owner_id: user.id,
         is_available: true,
-        price: offerBook.price,
-        accepts_swap: offerBook.acceptsSwap,
-      });
-
-      if (error){ 
-        console.error('Supabase error:', error.message);
-        throw new Error(`Supabase error: ${error.message}`);
+        is_wanted: false,
+        is_school_book: false,
+        price: offerBook.price ? Number(offerBook.price) : null,
+        accepts_swap: offerBook.acceptsSwap
+      };
+      
+      console.log('Submitting book data to Supabase:', bookData);
+      
+      const { data, error } = await supabase.from('books').insert([bookData]).select();
+      
+      if (error) {
+        console.error('Supabase error:', error);
+        throw new Error(`Failed to add book: ${error.message}`);
       }
-      console.log('Book inserted successfully');
-
-      toast({ title: "Book added successfully", description: "Your book has been added to your offers" });
-      setOfferBook({ isbn: '', title: '', author: '', genre: '', condition: 'good', description: '' });
+      
+      console.log('Book added successfully:', data);
+      
+      toast({
+        title: "Book added successfully",
+        description: "Your book has been added to your offers"
+      });
+      
+      // Reset form
+      setOfferBook({
+        isbn: '',
+        title: '',
+        author: '',
+        genre: '',
+        condition: 'good',
+        description: '',
+        price: null,
+        acceptsSwap: true
+      });
       setImagePreview(null);
       setImageFile(null);
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to add book", variant: "destructive" });
+      
+    } catch (error: any) {
+      console.error('Error adding book:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add book",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
   const handleWantedSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateWantedForm()) return;
-
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to add a book",
+        variant: "destructive"
+      });
+      navigate('/login');
+      return;
+    }
+    
+    if (!validateWantedForm()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        toast({ title: "Authentication required", description: "Please log in to add a book", variant: "destructive" });
-        return;
-      }
-      const { error } = await supabase.from('books').insert({
-        isbn: wantedBook.isbn,
+      const bookData = {
+        isbn: wantedBook.isbn || null,
         title: wantedBook.title,
         author: wantedBook.author,
         genre: wantedBook.genre,
-        description: wantedBook.description,
+        description: wantedBook.description || null,
         owner_id: user.id,
         is_available: false,
         is_wanted: true,
+        is_school_book: false
+      };
+      
+      const { data, error } = await supabase.from('books').insert([bookData]).select();
+      
+      if (error) {
+        throw new Error(`Failed to add book: ${error.message}`);
+      }
+      
+      toast({
+        title: "Book added successfully",
+        description: "Your book has been added to your wishlist"
       });
-
-      if (error) throw error;
-
-      toast({ title: "Book added successfully", description: "Your book has been added to your wishlist" });
-      setWantedBook({ isbn: '', title: '', author: '', genre: '', description: '' });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to add book", variant: "destructive" });
+      
+      // Reset form
+      setWantedBook({
+        isbn: '',
+        title: '',
+        author: '',
+        genre: '',
+        description: ''
+      });
+      
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add book",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  // Check if user is authenticated
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-bookswap-cream flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
+          <h2 className="text-2xl font-serif text-bookswap-darkbrown mb-4">Authentication Required</h2>
+          <p className="text-bookswap-brown mb-6">Please log in to add or request books.</p>
+          <div className="flex space-x-4 justify-center">
+            <Button onClick={() => navigate('/login')} className="bg-bookswap-brown hover:bg-bookswap-brown/90">
+              Log In
+            </Button>
+            <Button onClick={() => navigate('/register')} variant="outline" className="border-bookswap-brown text-bookswap-brown">
+              Register
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bookswap-cream animate-fade-in">
@@ -384,14 +475,14 @@ export default function PostBook() {
               <form onSubmit={handleOfferSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-6">
-                  <div className="space-y-2">
-                  <TooltipProvider>
+                    <div className="space-y-2">
+                      <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                      <Label htmlFor="isbn" className="text-bookswap-darkbrown">
-                        ISBN <span className="text-red-500">*</span>
-                      </Label>
-                      </TooltipTrigger>
+                            <Label htmlFor="isbn" className="text-bookswap-darkbrown">
+                              ISBN <span className="text-gray-500">(optional)</span>
+                            </Label>
+                          </TooltipTrigger>
                           <TooltipContent>
                             <p>Enter a 10 or 13-digit ISBN to autofill book details</p>
                           </TooltipContent>
@@ -404,7 +495,6 @@ export default function PostBook() {
                         onChange={handleOfferInputChange}
                         placeholder="Enter the book's ISBN (10 or 13 digits)"
                         className="border-bookswap-beige focus-visible:ring-bookswap-brown/20"
-                        required
                       />
                     </div>
 
@@ -563,6 +653,7 @@ export default function PostBook() {
                         className="border-bookswap-beige focus-visible:ring-bookswap-brown/20 min-h-[120px]"
                       />
                     </div>
+                    
                     <div className="space-y-2">
                       <Label htmlFor="price" className="text-bookswap-darkbrown">
                         Price (optional)
@@ -580,7 +671,7 @@ export default function PostBook() {
                       />
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 pt-2">
                       <Checkbox
                         id="acceptsSwap"
                         checked={offerBook.acceptsSwap}
@@ -590,8 +681,6 @@ export default function PostBook() {
                         Accept swap for this book
                       </Label>
                     </div>
-
-
                   </div>
                 </div>
                 
@@ -599,9 +688,19 @@ export default function PostBook() {
                   <Button
                     type="submit"
                     className="bg-bookswap-brown hover:bg-bookswap-brown/90 text-white font-serif"
+                    disabled={isSubmitting}
                   >
-                    <BookPlus className="mr-2 h-4 w-4" />
-                    Add Book to My Offers
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2"></div>
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <BookPlus className="mr-2 h-4 w-4" />
+                        Add Book to My Offers
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
@@ -680,9 +779,19 @@ export default function PostBook() {
                   <Button
                     type="submit"
                     className="bg-bookswap-accent hover:bg-bookswap-accent/90 text-white font-serif"
+                    disabled={isSubmitting}
                   >
-                    <BookMarked className="mr-2 h-4 w-4" />
-                    Add to My Wishlist
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2"></div>
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <BookMarked className="mr-2 h-4 w-4" />
+                        Add to My Wishlist
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>

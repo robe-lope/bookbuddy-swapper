@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       books: {
         Row: {
+          accepts_swap: boolean | null
           author: string
           condition: string | null
           created_at: string | null
@@ -18,19 +19,19 @@ export type Database = {
           educational_level: string | null
           genre: string
           id: string
-          isbn: string | null
           image_url: string | null
           is_available: boolean
           is_school_book: boolean
           is_wanted: boolean
+          isbn: string | null
           owner_id: string
+          price: number | null
           subject: string | null
           title: string
-          updated_at: string
-          price: number | null
-          accepts_swap: boolean
+          updated_at: string | null
         }
         Insert: {
+          accepts_swap?: boolean | null
           author: string
           condition?: string | null
           created_at?: string | null
@@ -38,19 +39,19 @@ export type Database = {
           educational_level?: string | null
           genre: string
           id?: string
-          isbn?: string | null
           image_url?: string | null
           is_available?: boolean
           is_school_book?: boolean
           is_wanted?: boolean
+          isbn?: string | null
           owner_id: string
+          price?: number | null
           subject?: string | null
           title: string
-          updated_at?: string
-          price: number | null
-          accepts_swap: boolean
+          updated_at?: string | null
         }
         Update: {
+          accepts_swap?: boolean | null
           author?: string
           condition?: string | null
           created_at?: string | null
@@ -58,17 +59,16 @@ export type Database = {
           educational_level?: string | null
           genre?: string
           id?: string
-          isbn?: string | null
           image_url?: string | null
           is_available?: boolean
           is_school_book?: boolean
           is_wanted?: boolean
+          isbn?: string | null
           owner_id?: string
+          price?: number | null
           subject?: string | null
           title?: string
           updated_at?: string | null
-          price: number | null
-          accepts_swap: boolean
         }
         Relationships: []
       }

@@ -63,6 +63,15 @@ export default function BookCard({ book, showActions = true, isWanted = false }:
     setIsLiked(!isLiked);
   };
 
+  const formatPrice = (price: number | null | undefined) => {
+    if (price === null || price === undefined) return null;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(price);
+  };
+
   return (
     <>
       <Card className="book-card overflow-hidden h-full flex flex-col transition-all duration-300 bg-white border-bookswap-beige hover:border-bookswap-brown">
@@ -78,6 +87,16 @@ export default function BookCard({ book, showActions = true, isWanted = false }:
                 {book.condition && (
                   <Badge className={`absolute top-2 right-2 ${getConditionColor(book.condition)}`}>
                     {getConditionText(book.condition)}
+                  </Badge>
+                )}
+                {book.price !== null && book.price !== undefined && (
+                  <Badge className="absolute bottom-2 left-2 bg-bookswap-brown text-white">
+                    {formatPrice(book.price)}
+                  </Badge>
+                )}
+                {book.acceptsSwap && (
+                  <Badge className="absolute bottom-2 right-2 bg-bookswap-accent text-white">
+                    Swap Available
                   </Badge>
                 )}
               </div>
@@ -151,6 +170,16 @@ export default function BookCard({ book, showActions = true, isWanted = false }:
                     {!isWanted && book.condition && (
                       <Badge className={getConditionColor(book.condition)}>
                         {getConditionText(book.condition)}
+                      </Badge>
+                    )}
+                    {book.price !== null && book.price !== undefined && (
+                      <Badge className="bg-bookswap-brown text-white">
+                        {formatPrice(book.price)}
+                      </Badge>
+                    )}
+                    {book.acceptsSwap && (
+                      <Badge className="bg-bookswap-accent text-white">
+                        Swap Available
                       </Badge>
                     )}
                   </div>
