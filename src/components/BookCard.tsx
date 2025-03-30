@@ -75,11 +75,11 @@ export default function BookCard({ book, showActions = true, isWanted = false }:
 
   // Handle image loading errors (especially for Google Books API urls)
   const handleImageError = () => {
-    console.log('Image failed to load:', book.image_url);
+    console.log('Image failed to load:', book.imageUrl);
     setImageError(true);
   };
 
-  const hasValidImage = book.image_url && !imageError;
+  const hasValidImage = book.imageUrl && !imageError;
 
   return (
     <>
@@ -89,7 +89,7 @@ export default function BookCard({ book, showActions = true, isWanted = false }:
             {!isWanted && hasValidImage ? (
               <div className="relative h-48 overflow-hidden">
                 <img 
-                  src={book.image_url} 
+                  src={book.imageUrl} 
                   alt={book.title} 
                   className="w-full h-full object-cover transition-transform duration-500 ease-in-out hover:scale-105"
                   onError={handleImageError}
@@ -166,7 +166,7 @@ export default function BookCard({ book, showActions = true, isWanted = false }:
                   {!isWanted && hasValidImage && (
                     <div className="max-h-64 overflow-hidden rounded-md">
                       <img 
-                        src={book.image_url} 
+                        src={book.imageUrl} 
                         alt={book.title} 
                         className="w-full h-full object-cover"
                         onError={handleImageError}

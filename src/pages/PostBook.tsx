@@ -1,830 +1,682 @@
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { BookPlus, Upload, BookMarked, Trash2 } from 'lucide-react';
-import { useToast } from "@/components/ui/use-toast";
-import { Book, BookCondition } from '@/types';
-import Navbar from '@/components/Navbar';
-import { supabase } from '@/integrations/supabase/client';
-import { Checkbox } from '@/components/ui/checkbox';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
 
-export default function PostBook() {
+// Import necessary components and hooks
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { BookCondition, EducationalLevel } from '@/types';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BookPlus, Upload, BookUp, Loader2 } from 'lucide-react';
+import { fetchGoogleBookImage } from '@/components/StorageBucket';
+
+// Define the schema for our form
+const offerBookSchema = z.object({
+  title: z.string().min(1, { message: 'Title is required' }),
+  author: z.string().min(1, { message: 'Author is required' }),
+  isbn: z.string().optional(),
+  genre: z.string().min(1, { message: 'Genre is required' }),
+  condition: z.enum(['like-new', 'very-good', 'good', 'fair', 'poor']).optional(),
+  description: z.string().optional(),
+  price: z.string().optional(),
+  acceptsSwap: z.boolean().default(false),
+  isSchoolBook: z.boolean().default(false),
+  educationalLevel: z.enum(['primary', 'secondary', 'high-school', 'university', 'other']).optional(),
+  subject: z.string().optional(),
+});
+
+const wantBookSchema = z.object({
+  title: z.string().min(1, { message: 'Title is required' }),
+  author: z.string().min(1, { message: 'Author is required' }),
+  genre: z.string().min(1, { message: 'Genre is required' }),
+  isbn: z.string().optional(),
+});
+
+type OfferBookForm = z.infer<typeof offerBookSchema>;
+type WantBookForm = z.infer<typeof wantBookSchema>;
+
+const PostBook = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [bookImageFile, setBookImageFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState('offer');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   
-  // Form state for books to offer
-  const [offerBook, setOfferBook] = useState<Partial<Book>>({
-    isbn: '',
-    title: '',
-    author: '',
-    genre: '',
-    condition: 'good',
-    description: '',
-    price: null,
-    acceptsSwap: true,
+  const offerForm = useForm<OfferBookForm>({
+    resolver: zodResolver(offerBookSchema),
+    defaultValues: {
+      title: '',
+      author: '',
+      isbn: '',
+      genre: '',
+      description: '',
+      price: '',
+      acceptsSwap: false,
+      isSchoolBook: false,
+    },
   });
   
-  // Google Books API data
-  const [googleBookData, setGoogleBookData] = useState<any>(null);
-  
-  // Form state for books wanted
-  const [wantedBook, setWantedBook] = useState<Partial<Book>>({
-    isbn: '',
-    title: '',
-    author: '',
-    genre: '',
+  const wantForm = useForm<WantBookForm>({
+    resolver: zodResolver(wantBookSchema),
+    defaultValues: {
+      title: '',
+      author: '',
+      genre: '',
+      isbn: '',
+    },
   });
-  
-  // Image upload state
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  
-  const genres = [
-    'Ficción', 'No ficción', 'Clásicos', 'Ciencia ficción', 'Fantasía', 'Romance',
-    'Misterio', 'Thriller', 'Terror', 'Aventura', 'Histórico', 'Poesía',
-    'Ensayo', 'Biografía', 'Autobiografía', 'Filosofía', 'Psicología',
-    'Crecimiento personal', 'Educación', 'Infantil', 'Juvenil', 'Arte',
-    'Fotografía', 'Cómics', 'Manga', 'Gastronomía', 'Cocina', 'Autoayuda',
-    'Negocios', 'Economía', 'Finanzas', 'Espiritualidad', 'Religión', 'Ciencias',
-    'Matemáticas', 'Medicina', 'Salud', 'Deportes', 'Viajes', 'Política',
-    'Sociología', 'Tecnología', 'Informática', 'Derecho'
-  ];
-  
-  const conditionOptions: { value: BookCondition; label: string }[] = [
-    { value: 'like-new', label: 'Like New' },
-    { value: 'very-good', label: 'Very Good' },
-    { value: 'good', label: 'Good' },
-    { value: 'fair', label: 'Fair' },
-    { value: 'poor', label: 'Poor' },
-  ];
-  
-  const fetchBookByIsbn = useCallback(async (isbn: string, isOffer: boolean) => {
-    try {
-      const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-      const data = await response.json();
-      
-      if (data.totalItems === 0) {
+
+  // Check if user is authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        navigate('/login');
         toast({
-          title: "No book found",
-          description: "No book matches that ISBN",
+          title: "Authentication required",
+          description: "You need to log in to post books.",
           variant: "destructive",
         });
-        return;
       }
+    };
+    
+    checkAuth();
+  }, [navigate, toast]);
 
-      const book = data.items[0].volumeInfo;
-      const bookData = {
-        isbn,
-        title: book.title || '',
-        author: book.authors?.[0] || '',
-        genre: book.categories?.[0] || '',
-      };
-
-      if (isOffer) {
-        setOfferBook(prev => ({ ...prev, ...bookData }));
-        setGoogleBookData(book);
-        
-        if (book.imageLinks?.thumbnail && !imageFile) {
-          setImagePreview(book.imageLinks.thumbnail.replace('http:', 'https:'));
-        }
-      } else {
-        setWantedBook(prev => ({ ...prev, ...bookData }));
-      }
-
-      toast({
-        title: "Book found",
-        description: `Autofilled: ${book.title}`,
-      });
-      console.log('Book data:', book);
-    } catch (error) {
-      console.error('Error fetching book data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch book data",
-        variant: "destructive",
-      });
-    }
-  }, [toast, imageFile]);
-
-  const handleOfferInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setOfferBook(prev => ({ ...prev, [name]: value }));
-    if (name === 'isbn' && value.length >= 10) {
-      fetchBookByIsbn(value, true);
-    }
-  };
-  
-  const handleWantedInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setWantedBook(prev => ({ ...prev, [name]: value }));
-    if (name === 'isbn' && value.length >= 10) {
-      fetchBookByIsbn(value, false);
-    }
-  };
-  
-  const handleOfferSelectChange = (name: string, value: string) => {
-    setOfferBook(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleWantedSelectChange = (name: string, value: string) => {
-    setWantedBook(prev => ({ ...prev, [name]: value }));
-  };
-  
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
       toast({
         title: "File too large",
-        description: "Please select an image under 5MB",
+        description: "Please select an image less than 5MB.",
         variant: "destructive",
       });
       return;
     }
     
-    if (!file.type.includes('image/')) {
-      toast({
-        title: "Invalid file type",
-        description: "Please select an image file",
-        variant: "destructive",
-      });
-      return;
-    }
+    setBookImageFile(file);
     
-    setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    // Create a preview URL
+    const fileUrl = URL.createObjectURL(file);
+    setPreviewUrl(fileUrl);
   };
-  
-  const removeImage = () => {
-    setImagePreview(null);
-    setImageFile(null);
+
+  const uploadBookImage = async (userId: string, bookId: string) => {
+    if (!bookImageFile) return null;
     
-    if (googleBookData?.imageLinks?.thumbnail) {
-      setImagePreview(googleBookData.imageLinks.thumbnail.replace('http:', 'https:'));
-    }
-  };
-  
-  const validateOfferForm = () => {
-    if (!offerBook.title?.trim()) {
-      toast({
-        title: "Missing title",
-        description: "Please enter the book title",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    if (!offerBook.author?.trim()) {
-      toast({
-        title: "Missing author",
-        description: "Please enter the book author",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    if (!offerBook.genre) {
-      toast({
-        title: "Missing genre",
-        description: "Please select a book genre",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    if (!offerBook.condition) {
-      toast({
-        title: "Missing condition",
-        description: "Please select the book condition",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    return true;
-  };
-  
-  const validateWantedForm = () => {
-    if (!wantedBook.title?.trim()) {
-      toast({
-        title: "Missing title",
-        description: "Please enter the book title",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    if (!wantedBook.author?.trim()) {
-      toast({
-        title: "Missing author",
-        description: "Please enter the book author",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    if (!wantedBook.genre) {
-      toast({
-        title: "Missing genre",
-        description: "Please select a book genre",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
-    return true;
-  };
-  
-  const uploadImage = async (file: File) => {
     try {
-      const fileName = `${Date.now()}-${file.name}`;
-      const { data, error } = await supabase.storage
+      setIsUploading(true);
+      setUploadProgress(10);
+      
+      const fileExt = bookImageFile.name.split('.').pop();
+      const filePath = `${userId}/${bookId}.${fileExt}`;
+      
+      setUploadProgress(30);
+      
+      const { error: uploadError, data } = await supabase.storage
         .from('book-images')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
+        .upload(filePath, bookImageFile, {
+          upsert: true,
+          contentType: bookImageFile.type,
         });
-        
+      
+      setUploadProgress(80);
+      
+      if (uploadError) {
+        throw uploadError;
+      }
+      
+      setUploadProgress(90);
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('book-images')
+        .getPublicUrl(filePath);
+      
+      setUploadProgress(100);
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: "Upload failed",
+        description: "There was a problem uploading your image.",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const onOfferSubmit = async (data: OfferBookForm) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Authentication error",
+          description: "Please log in and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Convert price from string to number or null
+      const priceValue = data.price ? parseFloat(data.price) : null;
+      
+      // Create book entry
+      const { data: book, error } = await supabase
+        .from('books')
+        .insert({
+          title: data.title,
+          author: data.author,
+          isbn: data.isbn || null,
+          genre: data.genre,
+          condition: data.condition || null,
+          description: data.description || null,
+          owner_id: user.id,
+          is_available: true,
+          is_wanted: false,
+          is_school_book: data.isSchoolBook,
+          educational_level: data.isSchoolBook ? data.educationalLevel : null,
+          subject: data.isSchoolBook ? data.subject : null,
+          price: priceValue,
+          accepts_swap: data.acceptsSwap,
+        })
+        .select()
+        .single();
+      
       if (error) {
-        console.error('Storage error:', error);
         throw error;
       }
       
-      const { data: urlData } = supabase.storage.from('book-images').getPublicUrl(fileName);
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Image upload error:', error);
-      throw error;
-    }
-  };
-
-  const handleOfferSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to add a book",
-        variant: "destructive"
-      });
-      navigate('/login');
-      return;
-    }
-    
-    if (!validateOfferForm()) {
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      console.log('Starting book offer submission process');
-      console.log('Current user:', user);
-      
+      // Upload image if provided
       let imageUrl = null;
-      
-      if (imageFile) {
-        console.log('Uploading user-provided image...');
-        imageUrl = await uploadImage(imageFile);
-        console.log('Image uploaded successfully:', imageUrl);
-      } 
-      else if (googleBookData?.imageLinks?.thumbnail) {
-        console.log('Using Google Books thumbnail');
-        imageUrl = googleBookData.imageLinks.thumbnail.replace('http:', 'https:');
+      if (bookImageFile) {
+        imageUrl = await uploadBookImage(user.id, book.id);
+      } else {
+        // Try to get image from Google Books API if no image was uploaded
+        imageUrl = await fetchGoogleBookImage(data.title, data.author);
       }
       
-      const bookData = {
-        isbn: offerBook.isbn || null,
-        title: offerBook.title,
-        author: offerBook.author,
-        genre: offerBook.genre,
-        condition: offerBook.condition,
-        description: offerBook.description || null,
-        image_url: imageUrl,
-        owner_id: user.id,
-        is_available: true,
-        is_wanted: false,
-        is_school_book: false,
-        price: offerBook.price ? Number(offerBook.price) : null,
-        accepts_swap: offerBook.acceptsSwap
-      };
-      
-      console.log('Submitting book data to Supabase:', bookData);
-      
-      const { data, error } = await supabase.from('books').insert([bookData]).select();
-      
-      if (error) {
-        console.error('Supabase error:', error);
-        throw new Error(`Failed to add book: ${error.message}`);
+      // Update book with image URL if available
+      if (imageUrl) {
+        const { error: updateError } = await supabase
+          .from('books')
+          .update({ image_url: imageUrl })
+          .eq('id', book.id);
+        
+        if (updateError) {
+          console.error('Error updating book with image URL:', updateError);
+        }
       }
-      
-      console.log('Book added successfully:', data);
       
       toast({
-        title: "Book added successfully",
-        description: "Your book has been added to your offers"
+        title: "Book posted!",
+        description: "Your book has been successfully added.",
       });
       
-      setOfferBook({
-        isbn: '',
-        title: '',
-        author: '',
-        genre: '',
-        condition: 'good',
-        description: '',
-        price: null,
-        acceptsSwap: true
-      });
-      setImagePreview(null);
-      setImageFile(null);
-      setGoogleBookData(null);
-      
+      navigate('/browse');
     } catch (error: any) {
-      console.error('Error adding book:', error);
+      console.error('Error posting book:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to add book",
-        variant: "destructive"
+        title: "Submission failed",
+        description: error.message || "There was a problem posting your book.",
+        variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  
-  const handleWantedSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to add a book",
-        variant: "destructive"
-      });
-      navigate('/login');
-      return;
-    }
-    
-    if (!validateWantedForm()) {
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      const bookData = {
-        isbn: wantedBook.isbn || null,
-        title: wantedBook.title,
-        author: wantedBook.author,
-        genre: wantedBook.genre,
-        description: wantedBook.description || null,
-        owner_id: user.id,
-        is_available: false,
-        is_wanted: true,
-        is_school_book: false
-      };
-      
-      const { data, error } = await supabase.from('books').insert([bookData]).select();
-      
-      if (error) {
-        throw new Error(`Failed to add book: ${error.message}`);
-      }
-      
-      toast({
-        title: "Book added successfully",
-        description: "Your book has been added to your wishlist"
-      });
-      
-      setWantedBook({
-        isbn: '',
-        title: '',
-        author: '',
-        genre: '',
-        description: ''
-      });
-      
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add book",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-bookswap-cream flex flex-col items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
-          <h2 className="text-2xl font-serif text-bookswap-darkbrown mb-4">Authentication Required</h2>
-          <p className="text-bookswap-brown mb-6">Please log in to add or request books.</p>
-          <div className="flex space-x-4 justify-center">
-            <Button onClick={() => navigate('/login')} className="bg-bookswap-brown hover:bg-bookswap-brown/90">
-              Log In
-            </Button>
-            <Button onClick={() => navigate('/register')} variant="outline" className="border-bookswap-brown text-bookswap-brown">
-              Register
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const onWantSubmit = async (data: WantBookForm) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Authentication error",
+          description: "Please log in and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Create wanted book entry
+      const { data: book, error } = await supabase
+        .from('books')
+        .insert({
+          title: data.title,
+          author: data.author,
+          isbn: data.isbn || null,
+          genre: data.genre,
+          owner_id: user.id,
+          is_available: false,
+          is_wanted: true,
+          is_school_book: false,
+        })
+        .select();
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Book added to wanted list!",
+        description: "You'll be notified if someone offers this book.",
+      });
+      
+      navigate('/browse');
+    } catch (error: any) {
+      console.error('Error adding wanted book:', error);
+      toast({
+        title: "Submission failed",
+        description: error.message || "There was a problem adding your wanted book.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-bookswap-cream animate-fade-in">
-      <Navbar />
+    <div className="container mx-auto py-10 px-4 max-w-4xl">
+      <h1 className="font-serif text-3xl font-bold text-bookswap-darkbrown mb-6 text-center">
+        Post a Book
+      </h1>
       
-      <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-bookswap-darkbrown mb-4">
-            Post a Book
-          </h1>
-          <p className="text-bookswap-brown text-lg">
-            Share books you own or add books you're looking for
-          </p>
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-8">
+          <TabsTrigger value="offer" className="flex items-center gap-2">
+            <BookPlus className="h-4 w-4" />
+            Offer a Book
+          </TabsTrigger>
+          <TabsTrigger value="want" className="flex items-center gap-2">
+            <BookUp className="h-4 w-4" />
+            Want a Book
+          </TabsTrigger>
+        </TabsList>
         
-        <Tabs 
-          defaultValue="offer" 
-          value={activeTab}
-          onValueChange={setActiveTab} 
-          className="w-full"
-        >
-          <TabsList className="bg-bookswap-beige/40 w-full flex p-1 rounded-lg mb-8">
-            <TabsTrigger 
-              value="offer" 
-              className="w-1/2 data-[state=active]:bg-white data-[state=active]:text-bookswap-darkbrown data-[state=active]:shadow-sm rounded-md py-3"
-            >
-              <BookPlus className="h-4 w-4 mr-2" />
-              Books I'm Offering
-            </TabsTrigger>
-            <TabsTrigger 
-              value="want" 
-              className="w-1/2 data-[state=active]:bg-white data-[state=active]:text-bookswap-darkbrown data-[state=active]:shadow-sm rounded-md py-3"
-            >
-              <BookMarked className="h-4 w-4 mr-2" />
-              Books I Want
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="offer" className="animate-fade-up">
-            <div className="bg-white rounded-lg shadow-sm border border-bookswap-beige p-6">
-              <form onSubmit={handleOfferSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Label htmlFor="isbn" className="text-bookswap-darkbrown">
-                              ISBN <span className="text-gray-500">(optional)</span>
-                            </Label>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Enter a 10 or 13-digit ISBN to autofill book details</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      <Input
-                        id="isbn"
-                        name="isbn"
-                        value={offerBook.isbn}
-                        onChange={handleOfferInputChange}
-                        placeholder="Enter the book's ISBN (10 or 13 digits)"
-                        className="border-bookswap-beige focus-visible:ring-bookswap-brown/20"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="title" className="text-bookswap-darkbrown">
-                        Book Title <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="title"
+        <TabsContent value="offer">
+          <Card>
+            <CardHeader>
+              <CardTitle>Offer a Book</CardTitle>
+              <CardDescription>
+                Share your book with the community - offer it for sale or swap.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...offerForm}>
+                <form onSubmit={offerForm.handleSubmit(onOfferSubmit)} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-6">
+                      <FormField
+                        control={offerForm.control}
                         name="title"
-                        value={offerBook.title}
-                        onChange={handleOfferInputChange}
-                        placeholder="Enter the book title"
-                        className="border-bookswap-beige focus-visible:ring-bookswap-brown/20"
-                        required
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Title*</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Book title" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="author" className="text-bookswap-darkbrown">
-                        Author <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="author"
-                        name="author"
-                        value={offerBook.author}
-                        onChange={handleOfferInputChange}
-                        placeholder="Enter the author's name"
-                        className="border-bookswap-beige focus-visible:ring-bookswap-brown/20"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="genre" className="text-bookswap-darkbrown">
-                        Genre <span className="text-red-500">*</span>
-                      </Label>
-                      <Select 
-                        value={offerBook.genre} 
-                        onValueChange={(value) => handleOfferSelectChange('genre', value)}
-                      >
-                        <SelectTrigger className="border-bookswap-beige focus:ring-bookswap-brown/20">
-                          <SelectValue placeholder="Select a genre" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-bookswap-beige">
-                          {genres.map(genre => (
-                            <SelectItem key={genre} value={genre}>{genre}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-bookswap-darkbrown">
-                        Condition <span className="text-red-500">*</span>
-                      </Label>
-                      <RadioGroup 
-                        value={offerBook.condition} 
-                        onValueChange={(value) => handleOfferSelectChange('condition', value as BookCondition)}
-                        className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2"
-                      >
-                        {conditionOptions.map(option => (
-                          <div 
-                            key={option.value} 
-                            className={`flex items-center space-x-2 border rounded-md p-3 transition-colors ${
-                              offerBook.condition === option.value 
-                                ? 'border-bookswap-brown bg-bookswap-beige/20' 
-                                : 'border-bookswap-beige hover:bg-bookswap-beige/10'
-                            }`}
-                          >
-                            <RadioGroupItem 
-                              value={option.value} 
-                              id={option.value}
-                              className="text-bookswap-brown"
-                            />
-                            <Label 
-                              htmlFor={option.value} 
-                              className={`flex-grow cursor-pointer ${
-                                offerBook.condition === option.value 
-                                  ? 'text-bookswap-darkbrown font-medium' 
-                                  : 'text-bookswap-brown'
-                              }`}
-                            >
-                              {option.label}
-                            </Label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="image" className="text-bookswap-darkbrown block">
-                        Book Image
-                      </Label>
                       
-                      {imagePreview ? (
-                        <div className="relative rounded-md overflow-hidden border border-bookswap-beige h-48 group">
-                          <img 
-                            src={imagePreview} 
-                            alt="Book preview" 
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-bookswap-darkbrown/0 group-hover:bg-bookswap-darkbrown/60 transition-colors flex items-center justify-center">
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={removeImage}
+                      <FormField
+                        control={offerForm.control}
+                        name="author"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Author*</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Author name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={offerForm.control}
+                        name="isbn"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>ISBN</FormLabel>
+                            <FormControl>
+                              <Input placeholder="ISBN (optional)" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              International Standard Book Number
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={offerForm.control}
+                        name="genre"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Genre*</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Genre" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="space-y-6">
+                      <FormField
+                        control={offerForm.control}
+                        name="condition"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Condition</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              defaultValue={field.value}
                             >
-                              <Trash2 className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="border-2 border-dashed border-bookswap-beige rounded-md h-48 flex flex-col items-center justify-center p-4 hover:bg-bookswap-beige/10 transition-colors">
-                          <Upload className="h-8 w-8 text-bookswap-brown mb-2" />
-                          <p className="text-sm text-bookswap-brown text-center mb-2">
-                            Drag and drop an image or click to browse
-                          </p>
-                          <Input
-                            id="image"
-                            type="file"
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select condition" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="like-new">Like New</SelectItem>
+                                <SelectItem value="very-good">Very Good</SelectItem>
+                                <SelectItem value="good">Good</SelectItem>
+                                <SelectItem value="fair">Fair</SelectItem>
+                                <SelectItem value="poor">Poor</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={offerForm.control}
+                        name="price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Price</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                step="0.01" 
+                                placeholder="Set a price (optional)" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Leave empty if you only want to swap
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={offerForm.control}
+                        name="acceptsSwap"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Available for Swap</FormLabel>
+                              <FormDescription>
+                                Allow others to offer their books in exchange
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="mt-4">
+                        <Label htmlFor="bookImage">Book Image</Label>
+                        <div className="mt-2 flex items-center gap-4">
+                          <Label 
+                            htmlFor="bookImage" 
+                            className="cursor-pointer flex items-center justify-center gap-2 border border-dashed border-input rounded-md p-4 hover:bg-muted/50 transition-colors"
+                          >
+                            <Upload className="h-5 w-5" />
+                            {bookImageFile ? 'Change Image' : 'Upload Image'}
+                          </Label>
+                          <Input 
+                            id="bookImage" 
+                            type="file" 
+                            className="hidden" 
                             accept="image/*"
                             onChange={handleImageChange}
-                            className="hidden"
                           />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="border-bookswap-beige text-bookswap-darkbrown"
-                            onClick={() => document.getElementById('image')?.click()}
-                          >
-                            Upload Image
-                          </Button>
+                          
+                          {previewUrl && (
+                            <div className="relative w-24 h-24 overflow-hidden rounded-md border">
+                              <img 
+                                src={previewUrl} 
+                                alt="Book preview" 
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          
+                          {!previewUrl && (
+                            <div className="text-sm text-muted-foreground">
+                              If no image is uploaded, we'll try to find one online
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <p className="text-xs text-bookswap-brown mt-1">
-                        Maximum file size: 5MB. Formats: JPG, PNG, GIF
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="description" className="text-bookswap-darkbrown">
-                        Description
-                      </Label>
-                      <Textarea
-                        id="description"
-                        name="description"
-                        value={offerBook.description}
-                        onChange={handleOfferInputChange}
-                        placeholder="Add details about the book's condition, edition, etc."
-                        className="border-bookswap-beige focus-visible:ring-bookswap-brown/20 min-h-[120px]"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="price" className="text-bookswap-darkbrown">
-                        Price (optional)
-                      </Label>
-                      <Input
-                        id="price"
-                        name="price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={offerBook.price ?? ''}
-                        onChange={handleOfferInputChange}
-                        placeholder="Enter price in your currency (e.g., 500)"
-                        className="border-bookswap-beige focus-visible:ring-bookswap-brown/20"
-                      />
-                    </div>
-
-                    <div className="flex items-center space-x-2 pt-2">
-                      <Checkbox
-                        id="acceptsSwap"
-                        checked={offerBook.acceptsSwap}
-                        onCheckedChange={(checked) => setOfferBook(prev => ({ ...prev, acceptsSwap: !!checked }))}
-                      />
-                      <Label htmlFor="acceptsSwap" className="text-bookswap-darkbrown">
-                        Accept swap for this book
-                      </Label>
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <div className="pt-4 border-t border-bookswap-beige flex justify-end">
-                  <Button
-                    type="submit"
-                    className="bg-bookswap-brown hover:bg-bookswap-brown/90 text-white font-serif"
-                    disabled={isSubmitting}
+                  
+                  <FormField
+                    control={offerForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Provide a short description of the book" 
+                            className="min-h-[120px]" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={offerForm.control}
+                    name="isSchoolBook"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">School/Educational Book</FormLabel>
+                          <FormDescription>
+                            Is this a textbook or educational material?
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {offerForm.watch('isSchoolBook') && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={offerForm.control}
+                        name="educationalLevel"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Educational Level</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select level" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="primary">Primary School</SelectItem>
+                                <SelectItem value="secondary">Secondary School</SelectItem>
+                                <SelectItem value="high-school">High School</SelectItem>
+                                <SelectItem value="university">University</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={offerForm.control}
+                        name="subject"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Subject</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g. Mathematics, History" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-bookswap-brown hover:bg-bookswap-brown/90"
+                    disabled={isUploading}
                   >
-                    {isSubmitting ? (
+                    {isUploading ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2"></div>
-                        Adding...
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Uploading... {uploadProgress}%
                       </>
                     ) : (
-                      <>
-                        <BookPlus className="mr-2 h-4 w-4" />
-                        Add Book to My Offers
-                      </>
+                      'Post Book'
                     )}
                   </Button>
-                </div>
-              </form>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="want" className="animate-fade-up">
-            <div className="bg-white rounded-lg shadow-sm border border-bookswap-beige p-6">
-              <form onSubmit={handleWantedSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="wantedTitle" className="text-bookswap-darkbrown">
-                      Book Title <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="wantedTitle"
-                      name="title"
-                      value={wantedBook.title}
-                      onChange={handleWantedInputChange}
-                      placeholder="Enter the book title you're looking for"
-                      className="border-bookswap-beige focus-visible:ring-bookswap-brown/20"
-                      required
-                    />
-                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="want">
+          <Card>
+            <CardHeader>
+              <CardTitle>Want a Book</CardTitle>
+              <CardDescription>
+                Let the community know you're looking for a specific book.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...wantForm}>
+                <form onSubmit={wantForm.handleSubmit(onWantSubmit)} className="space-y-6">
+                  <FormField
+                    control={wantForm.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Title*</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Book title" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="wantedAuthor" className="text-bookswap-darkbrown">
-                      Author <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="wantedAuthor"
-                      name="author"
-                      value={wantedBook.author}
-                      onChange={handleWantedInputChange}
-                      placeholder="Enter the author's name"
-                      className="border-bookswap-beige focus-visible:ring-bookswap-brown/20"
-                      required
-                    />
-                  </div>
+                  <FormField
+                    control={wantForm.control}
+                    name="author"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Author*</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Author name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="wantedGenre" className="text-bookswap-darkbrown">
-                      Genre <span className="text-red-500">*</span>
-                    </Label>
-                    <Select 
-                      value={wantedBook.genre} 
-                      onValueChange={(value) => handleWantedSelectChange('genre', value)}
-                    >
-                      <SelectTrigger className="border-bookswap-beige focus:ring-bookswap-brown/20">
-                        <SelectValue placeholder="Select a genre" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-bookswap-beige">
-                        {genres.map(genre => (
-                          <SelectItem key={genre} value={genre}>{genre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <FormField
+                    control={wantForm.control}
+                    name="genre"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Genre*</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Genre" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="wantedDescription" className="text-bookswap-darkbrown">
-                      Additional Information (Optional)
-                    </Label>
-                    <Textarea
-                      id="wantedDescription"
-                      name="description"
-                      value={wantedBook.description}
-                      onChange={handleWantedInputChange}
-                      placeholder="Edition preferences, etc."
-                      className="border-bookswap-beige focus-visible:ring-bookswap-brown/20"
-                    />
-                  </div>
-                </div>
-                
-                <div className="pt-4 border-t border-bookswap-beige flex justify-end">
-                  <Button
-                    type="submit"
-                    className="bg-bookswap-accent hover:bg-bookswap-accent/90 text-white font-serif"
-                    disabled={isSubmitting}
+                  <FormField
+                    control={wantForm.control}
+                    name="isbn"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ISBN</FormLabel>
+                        <FormControl>
+                          <Input placeholder="ISBN (optional)" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          International Standard Book Number
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-bookswap-accent hover:bg-bookswap-accent/90"
                   >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2"></div>
-                        Adding...
-                      </>
-                    ) : (
-                      <>
-                        <BookMarked className="mr-2 h-4 w-4" />
-                        Add to My Wishlist
-                      </>
-                    )}
+                    Add to Wanted Books
                   </Button>
-                </div>
-              </form>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
-}
+};
+
+export default PostBook;
