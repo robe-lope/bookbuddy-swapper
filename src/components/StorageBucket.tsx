@@ -22,12 +22,8 @@ export const createBookImagesBucket = async () => {
         return false;
       }
       
-      // Set up public policy for the bucket
-      const { error: policyError } = await supabase.storage.from('book-images').setPublic();
-      
-      if (policyError) {
-        console.error('Error setting public policy for book-images bucket:', policyError);
-      }
+      // The bucket is already set to public during creation
+      console.log('Book-images bucket created with public access');
       
       return true;
     }
