@@ -25,6 +25,25 @@ export const createBookImagesBucket = async () => {
       // The bucket is already set to public during creation
       console.log('Book-images bucket created with public access');
       
+      // Setup RLS policies for the bucket to ensure public access
+      try {
+        // Set RLS policies for the bucket
+        const { error: policyError } = await supabase.rpc('create_storage_policy', {
+          bucket_name: 'book-images',
+          policy_name: 'Public Access',
+          definition: 'true', // Allow public access
+          operation: 'ALL'     // Allow all operations
+        });
+        
+        if (policyError) {
+          console.error('Error setting RLS policy:', policyError);
+        } else {
+          console.log('RLS policy set successfully');
+        }
+      } catch (policyError) {
+        console.error('Failed to set RLS policy:', policyError);
+      }
+      
       return true;
     }
     
@@ -49,18 +68,18 @@ export function StorageBucketSetup() {
           console.log('Book images storage bucket is ready');
         } else {
           toast({
-            title: 'Storage Setup Issue',
-            description: 'There was a problem setting up the storage bucket for book images.',
-            variant: 'destructive'
+            title: "Storage Setup Issue",
+            description: "There was a problem setting up the storage bucket for book images.",
+            variant: "destructive"
           });
         }
       } catch (error) {
         console.error('Error in bucket check:', error);
         setIsChecking(false);
         toast({
-          title: 'Storage Error',
-          description: 'Failed to set up storage for book images.',
-          variant: 'destructive'
+          title: "Storage Error",
+          description: "Failed to set up storage for book images.",
+          variant: "destructive"
         });
       }
     };

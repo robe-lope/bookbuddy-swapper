@@ -1,5 +1,4 @@
-
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +45,9 @@ export default function PostBook() {
     price: null,
     acceptsSwap: true,
   });
+  
+  // Google Books API data
+  const [googleBookData, setGoogleBookData] = useState<any>(null);
   
   // Form state for books wanted
   const [wantedBook, setWantedBook] = useState<Partial<Book>>({
@@ -102,6 +104,11 @@ export default function PostBook() {
 
       if (isOffer) {
         setOfferBook(prev => ({ ...prev, ...bookData }));
+        setGoogleBookData(book);
+        
+        if (book.imageLinks?.thumbnail && !imageFile) {
+          setImagePreview(book.imageLinks.thumbnail.replace('http:', 'https:'));
+        }
       } else {
         setWantedBook(prev => ({ ...prev, ...bookData }));
       }
@@ -119,7 +126,7 @@ export default function PostBook() {
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [toast, imageFile]);
 
   const handleOfferInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -178,6 +185,10 @@ export default function PostBook() {
   const removeImage = () => {
     setImagePreview(null);
     setImageFile(null);
+    
+    if (googleBookData?.imageLinks?.thumbnail) {
+      setImagePreview(googleBookData.imageLinks.thumbnail.replace('http:', 'https:'));
+    }
   };
   
   const validateOfferForm = () => {
@@ -256,7 +267,10 @@ export default function PostBook() {
       const fileName = `${Date.now()}-${file.name}`;
       const { data, error } = await supabase.storage
         .from('book-images')
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
         
       if (error) {
         console.error('Storage error:', error);
@@ -295,10 +309,15 @@ export default function PostBook() {
       console.log('Current user:', user);
       
       let imageUrl = null;
+      
       if (imageFile) {
-        console.log('Uploading image...');
+        console.log('Uploading user-provided image...');
         imageUrl = await uploadImage(imageFile);
         console.log('Image uploaded successfully:', imageUrl);
+      } 
+      else if (googleBookData?.imageLinks?.thumbnail) {
+        console.log('Using Google Books thumbnail');
+        imageUrl = googleBookData.imageLinks.thumbnail.replace('http:', 'https:');
       }
       
       const bookData = {
@@ -333,7 +352,6 @@ export default function PostBook() {
         description: "Your book has been added to your offers"
       });
       
-      // Reset form
       setOfferBook({
         isbn: '',
         title: '',
@@ -346,6 +364,7 @@ export default function PostBook() {
       });
       setImagePreview(null);
       setImageFile(null);
+      setGoogleBookData(null);
       
     } catch (error: any) {
       console.error('Error adding book:', error);
@@ -402,7 +421,6 @@ export default function PostBook() {
         description: "Your book has been added to your wishlist"
       });
       
-      // Reset form
       setWantedBook({
         isbn: '',
         title: '',
@@ -422,7 +440,6 @@ export default function PostBook() {
     }
   };
 
-  // Check if user is authenticated
   if (!user) {
     return (
       <div className="min-h-screen bg-bookswap-cream flex flex-col items-center justify-center p-4">

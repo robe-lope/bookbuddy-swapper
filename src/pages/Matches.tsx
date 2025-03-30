@@ -84,7 +84,7 @@ export default function Matches() {
         ownerId: '1',
         isAvailable: true,
         price: 500,
-        acceptsSwap: false,
+        acceptsSwap: true,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -97,7 +97,7 @@ export default function Matches() {
         ownerId: '2',
         isAvailable: true,
         price: 500,
-        acceptsSwap: false,
+        acceptsSwap: true,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -136,7 +136,7 @@ export default function Matches() {
         ownerId: '1',
         isAvailable: true,
         price: 500,
-        acceptsSwap: false,
+        acceptsSwap: true,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -149,7 +149,7 @@ export default function Matches() {
         ownerId: '3',
         isAvailable: true,
         price: 500,
-        acceptsSwap: false,
+        acceptsSwap: true,
         createdAt: new Date(),
         updatedAt: new Date()
       },
