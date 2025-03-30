@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -21,17 +22,19 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <BrowserRouter>
-      <I18nextProvider i18n={i18n}>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <StorageBucketSetup />
-            <AppRoutes />
-            <Toaster />
-          </AuthProvider>
-        </QueryClientProvider>
-      </I18nextProvider>
-    </BrowserRouter>
+    <React.StrictMode>
+      <BrowserRouter>
+        <I18nextProvider i18n={i18n}>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <StorageBucketSetup />
+              <AppRoutes />
+              <Toaster />
+            </AuthProvider>
+          </QueryClientProvider>
+        </I18nextProvider>
+      </BrowserRouter>
+    </React.StrictMode>
   );
 }
 
