@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -11,14 +10,13 @@ import { AuthLayout } from '@/components/auth/AuthLayout';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{email?: string; password?: string}>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const { login, loading, error } = useAuth();
   const navigate = useNavigate();
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
-
   const validateForm = () => {
-    const newErrors: {email?: string; password?: string} = {};
+    const newErrors: { email?: string; password?: string } = {};
     
     if (!email) {
       newErrors.email = 'Email is required';
@@ -42,10 +40,14 @@ export default function Login() {
     setAbortController(controller);
 
     try {
-      await login(email, password, controller.signal); // Pasamos el signal para cancelación
+      await login(email, password, controller.signal);
       navigate('/profile');
     } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('Login cancelled by user');
+      } else {
         console.error('Login error:', err.message);
+      }
     } finally {
       setAbortController(null);
     }
@@ -86,10 +88,7 @@ export default function Login() {
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label 
-            htmlFor="email" 
-            className="text-bookswap-darkbrown"
-          >
+          <Label htmlFor="email" className="text-bookswap-darkbrown">
             Email
           </Label>
           <div className="input-focus-effect rounded-md border border-bookswap-beige">
@@ -100,6 +99,7 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+              disabled={loading}
             />
           </div>
           {errors.email && (
@@ -109,10 +109,7 @@ export default function Login() {
         
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label 
-              htmlFor="password" 
-              className="text-bookswap-darkbrown"
-            >
+            <Label htmlFor="password" className="text-bookswap-darkbrown">
               Password
             </Label>
             <Link 
@@ -126,10 +123,10 @@ export default function Login() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="border-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent"
+              disabled={loading}
             />
           </div>
           {errors.password && (
@@ -143,23 +140,34 @@ export default function Login() {
           </div>
         )}
         
-        <Button 
-          type="submit" 
-          className="w-full bg-bookswap-brown hover:bg-bookswap-brown/90 text-white"
-          disabled={loading}
-        >
-          {loading ? (
-            <div className="flex items-center">
-              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2"></div>
-              Logging in...
-            </div>
-          ) : (
-            <div className="flex items-center">
-              Login
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </div>
+        <div className="flex space-x-2">
+          <Button 
+            type="submit" 
+            className="flex-1 bg-bookswap-brown hover:bg-bookswap-brown/90 text-white"
+            disabled={loading}
+          >
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2"></div>
+                Logging in...
+              </div>
+            ) : (
+              <div className="flex items-center justify-center">
+                Login
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </div>
+            )}
+          </Button>
+          {loading && (
+            <Button
+              variant="destructive"
+              onClick={handleCancel}
+              className="px-4"
+            >
+              Cancel
+            </Button>
           )}
-        </Button>
+        </div>
       </form>
     </AuthLayout>
   );

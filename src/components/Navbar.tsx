@@ -1,23 +1,29 @@
 
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { BookOpen, Menu, X, User, MessageSquare, Search, Home, PlusCircle } from 'lucide-react';
+import { BookOpen, Menu, X, User, MessageSquare, Search, Home, PlusCircle, LogOut } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const isMobile = useIsMobile();
-  
-  // Mock authentication state - In a real app, this would come from an auth context
-  const isAuthenticated = false;
-  
+  const { user, logout, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/'); 
+    if (isMobile) setIsMenuOpen(false);
+  };
+
   const isActive = (path: string) => {
     return location.pathname === path;
   };
@@ -84,6 +90,14 @@ export default function Navbar() {
                     Profile
                   </Button>
                 </Link>
+                <Button
+                  variant="ghost"
+                  onClick={handleLogout}
+                  className="text-bookswap-darkbrown hover:text-bookswap-darkbrown hover:bg-bookswap-beige/20"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </Button>
               </>
             ) : (
               <>
@@ -179,6 +193,14 @@ export default function Navbar() {
                           Profile
                         </Button>
                       </Link>
+                      <Button 
+                        variant="ghost"
+                        onClick={handleLogout}
+                        className="w-full justify-start text-bookswap-darkbrown hover:text-bookswap-darkbrown hover:bg-bookswap-beige/20"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Log out
+                      </Button>
                     </>
                   ) : (
                     <>

@@ -33,6 +33,8 @@ export type Book = {
   subject?: string;
   createdAt: Date; // Matches created_at in Supabase
   updatedAt: Date; // Matches updated_at in Supabase
+  price: number | null;
+  acceptsSwap: boolean;
 };
 
 // This is what we'll use internally in our app
@@ -97,7 +99,10 @@ export const mapSupabaseBook = (book: any): Book => ({
   educationalLevel: book.educational_level as EducationalLevel,
   subject: book.subject,
   createdAt: new Date(book.created_at),
-  updatedAt: new Date(book.updated_at)
+  updatedAt: new Date(book.updated_at),
+  price: book.price,
+  acceptsSwap: book.accepts_swap,
+  
 });
 
 // For now, we'll use dummy data with these interfaces
