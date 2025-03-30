@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +9,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   error: string | null;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
   login: (email: string, password: string, signal?: AbortSignal) => Promise<void>;
   register: (email: string, username: string, password: string, userType?: string, signal?: AbortSignal) => Promise<void>;
   logout: () => Promise<void>;
@@ -50,6 +52,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await fetchUserProfile();
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
+        setLoading(false); // Reset loading state when signed out
+        setError(null); // Clear any errors
       }
     });
 
@@ -119,7 +123,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Login timed out after 10 seconds')), 10000)
       );
@@ -128,7 +131,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       await Promise.race([loginPromise, timeoutPromise]);
       
-      const result = await Promise.race([loginPromise, timeoutPromise]);
       const { error } = await loginPromise; 
       if (error) throw error;
 
@@ -197,8 +199,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     try {
+      setLoading(true); // Set loading before logout
       await supabase.auth.signOut();
       setUser(null);
+      setError(null); // Clear any errors on logout
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",
@@ -211,6 +215,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: "There was an error signing out. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false); // Always reset loading state after logout attempt
     }
   };
 
@@ -220,6 +226,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         loading,
         error,
+        setError, // Add setError to the context
         login,
         register,
         logout,

@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,9 +12,24 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const { login, loading, error } = useAuth();
+  const { login, loading, error, setError } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  
+  // Reset form state when the component mounts or when the location changes
+  useEffect(() => {
+    // Reset error and loading state when navigating to login page
+    setError(null);
+    
+    // Clear form on component mount or location change
+    return () => {
+      if (abortController) {
+        abortController.abort();
+        setAbortController(null);
+      }
+    };
+  }, [location.key, setError]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
