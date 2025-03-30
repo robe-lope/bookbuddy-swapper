@@ -83,6 +83,8 @@ export default function Matches() {
         condition: 'very-good',
         ownerId: '1',
         isAvailable: true,
+        price: 500,
+        acceptsSwap: false,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -94,6 +96,8 @@ export default function Matches() {
         condition: 'good',
         ownerId: '2',
         isAvailable: true,
+        price: 500,
+        acceptsSwap: false,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -131,6 +135,8 @@ export default function Matches() {
         condition: 'fair',
         ownerId: '1',
         isAvailable: true,
+        price: 500,
+        acceptsSwap: false,
         createdAt: new Date(),
         updatedAt: new Date()
       },
@@ -142,6 +148,8 @@ export default function Matches() {
         condition: 'like-new',
         ownerId: '3',
         isAvailable: true,
+        price: 500,
+        acceptsSwap: false,
         createdAt: new Date(),
         updatedAt: new Date()
       },
