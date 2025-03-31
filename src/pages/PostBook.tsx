@@ -63,7 +63,9 @@ type WantBookForm = z.infer<typeof wantBookSchema>;
 export default function PostBook() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [bookImageFile, setBookImageFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState('offer');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);

@@ -57,6 +57,7 @@ const getConditionText = (condition?: BookCondition) => {
 export default function BookCard({ book, showActions = true, isWanted = false }: BookCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const toggleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -72,17 +73,26 @@ export default function BookCard({ book, showActions = true, isWanted = false }:
     }).format(price);
   };
 
+  // Handle image loading errors (especially for Google Books API urls)
+  const handleImageError = () => {
+    console.log('Image failed to load:', book.imageUrl);
+    setImageError(true);
+  };
+
+  const hasValidImage = book.imageUrl && !imageError;
+
   return (
     <>
       <Card className="book-card overflow-hidden h-full flex flex-col transition-all duration-300 bg-white border-bookswap-beige hover:border-bookswap-brown">
         <CardContent className="p-0 flex-grow flex flex-col">
           <div className="relative">
-            {!isWanted && book.imageUrl ? (
+            {!isWanted && hasValidImage ? (
               <div className="relative h-48 overflow-hidden">
                 <img 
                   src={book.imageUrl} 
                   alt={book.title} 
                   className="w-full h-full object-cover transition-transform duration-500 ease-in-out hover:scale-105"
+                  onError={handleImageError}
                 />
                 {book.condition && (
                   <Badge className={`absolute top-2 right-2 ${getConditionColor(book.condition)}`}>
@@ -153,12 +163,13 @@ export default function BookCard({ book, showActions = true, isWanted = false }:
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 mt-2">
-                  {!isWanted && book.imageUrl && (
+                  {!isWanted && hasValidImage && (
                     <div className="max-h-64 overflow-hidden rounded-md">
                       <img 
                         src={book.imageUrl} 
                         alt={book.title} 
-                        className="w-full h-full object-cover" 
+                        className="w-full h-full object-cover"
+                        onError={handleImageError}
                       />
                     </div>
                   )}
